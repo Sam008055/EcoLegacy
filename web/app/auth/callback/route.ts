@@ -10,10 +10,19 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      // Use production URL if available, otherwise use origin
+      const redirectUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL || process.env.NEXT_PUBLIC_SITE_URL}${next}`
+        : `${origin}${next}`
+      
+      return NextResponse.redirect(redirectUrl)
     }
   }
 
   // return the user to an error page with instructions
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+  const errorUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL || process.env.NEXT_PUBLIC_SITE_URL}/auth/auth-code-error`
+    : `${origin}/auth/auth-code-error`
+    
+  return NextResponse.redirect(errorUrl)
 }

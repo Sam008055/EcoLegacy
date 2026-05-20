@@ -50,6 +50,9 @@ async function createVoiceClone(
     formData.append('language', 'en');
 
     console.log(`[TTS] Creating voice clone for ${characterId} using smallest.ai`);
+    console.log(`[TTS] Reference audio: ${referenceAudioPath}`);
+    console.log(`[TTS] Audio file size: ${audioBuffer.length} bytes`);
+    console.log(`[TTS] API Key configured: ${apiKey ? 'Yes' : 'No'}`);
 
     const response = await fetch(`${SMALLEST_API_BASE}/voice-cloning`, {
       method: 'POST',
@@ -59,8 +62,11 @@ async function createVoiceClone(
       body: formData,
     });
 
+    console.log(`[TTS] Smallest.ai response status: ${response.status}`);
+
     if (response.ok) {
       const result = await response.json();
+      console.log(`[TTS] Smallest.ai response:`, JSON.stringify(result, null, 2));
       const voiceId = result.data?.voiceId;
       if (voiceId) {
         CHARACTER_VOICE_IDS[characterId] = voiceId;
