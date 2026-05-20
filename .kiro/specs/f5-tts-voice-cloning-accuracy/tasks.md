@@ -14,7 +14,7 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
   - _Requirements: 1.1, 2.1, 3.1, 4.1_
 
 - [ ] 2. Implement Audio Preprocessor component
-  - [~] 2.1 Create AudioPreprocessor class with validation methods
+  - [ ] 2.1 Create AudioPreprocessor class with validation methods
     - Implement audio quality validation (sample rate, noise levels, clarity detection)
     - Add format conversion support (WAV, MP3, FLAC to optimal format)
     - Create audio normalization and silence removal functionality
@@ -28,7 +28,7 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - **Property 2: Audio Normalization Preservation**
     - **Validates: Requirements 1.3**
   
-  - [~] 2.4 Implement optimal segment extraction for long audio files
+  - [ ] 2.4 Implement optimal segment extraction for long audio files
     - Create algorithm to identify clearest 10-30 second segments from longer recordings
     - Add signal-to-noise ratio analysis and speech clarity metrics
     - _Requirements: 1.4_
@@ -42,7 +42,7 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - **Validates: Requirements 1.5**
 
 - [ ] 3. Implement Quality Validator component
-  - [~] 3.1 Create QualityValidator class with speaker verification
+  - [ ] 3.1 Create QualityValidator class with speaker verification
     - Integrate speechbrain or similar model for voice similarity scoring
     - Implement audio artifact detection (clipping, distortion, unnatural pauses)
     - Add quality threshold enforcement and validation logic
@@ -56,7 +56,7 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - **Property 9: Audio Artifact Detection Accuracy**
     - **Validates: Requirements 3.3**
   
-  - [~] 3.4 Implement quality metrics logging and monitoring
+  - [ ] 3.4 Implement quality metrics logging and monitoring
     - Create comprehensive metrics collection for generation time, similarity scores, backend usage
     - Add performance statistics tracking and reporting capabilities
     - _Requirements: 3.4, 7.1_
@@ -65,11 +65,11 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - **Property 10: Metrics Logging Completeness**
     - **Validates: Requirements 3.4, 7.1**
 
-- [~] 4. Checkpoint - Ensure audio processing components pass tests
+- [ ] 4. Checkpoint - Ensure audio processing components pass tests
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 5. Implement Character Configuration Manager
-  - [~] 5.1 Create CharacterConfigManager class
+  - [ ] 5.1 Create CharacterConfigManager class
     - Implement character-specific parameter storage and retrieval
     - Add parameter optimization based on historical performance data
     - Create configuration validation and default parameter management
@@ -83,7 +83,7 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - **Property 12: Successful Parameter Caching**
     - **Validates: Requirements 4.5**
   
-  - [~] 5.4 Implement A/B testing support for parameter tuning
+  - [ ] 5.4 Implement A/B testing support for parameter tuning
     - Create framework for testing different parameter combinations
     - Add comparison metrics and optimization recommendations
     - _Requirements: 8.3_
@@ -93,19 +93,19 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - **Validates: Requirements 8.3**
 
 - [ ] 6. Implement Voice Generation Backends
-  - [~] 6.1 Create VoiceGenerationBackend interface and implementations
+  - [ ] 6.1 Create VoiceGenerationBackend interface and implementations
     - Implement LocalF5TTSBackend for local F5-TTS installation
     - Create HuggingFaceF5TTSBackend for Gradio space integration
     - Add FallbackTTSBackend for alternative TTS services
     - _Requirements: 4.3, 4.4_
   
-  - [~] 6.2 Implement backend selection and fallback logic
+  - [ ] 6.2 Implement backend selection and fallback logic
     - Create automatic backend switching based on availability and quota
     - Add retry logic with exponential backoff for failed requests
     - Implement quota monitoring and management
     - _Requirements: 4.4, 5.2_
   
-  - [~] 6.3 Add voice generation with character-specific parameters
+  - [ ] 6.3 Add voice generation with character-specific parameters
     - Integrate character configuration with backend generation calls
     - Implement parameter optimization and caching for successful combinations
     - _Requirements: 4.2, 4.5_
@@ -116,7 +116,7 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - _Requirements: 4.4, 5.2_
 
 - [ ] 7. Implement Enhanced TTS Server
-  - [~] 7.1 Create EnhancedTTSServer class with request orchestration
+  - [ ] 7.1 Create EnhancedTTSServer class with request orchestration
     - Implement main voice generation endpoint with full pipeline integration
     - Add request queuing and prioritization for concurrent requests
     - Create health check and metrics endpoints
@@ -130,7 +130,7 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - **Property 15: Concurrent Request Quality Maintenance**
     - **Validates: Requirements 5.5**
   
-  - [~] 7.4 Implement intelligent caching system
+  - [ ] 7.4 Implement intelligent caching system
     - Create content-based cache keys for text and character combinations
     - Add cache invalidation and TTL management
     - Implement cache hit/miss tracking and optimization
@@ -140,7 +140,7 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - **Property 14: Intelligent Caching Behavior**
     - **Validates: Requirements 5.4**
   
-  - [~] 7.6 Integrate all components into complete pipeline
+  - [ ] 7.6 Integrate all components into complete pipeline
     - Wire AudioPreprocessor, QualityValidator, and backends together
     - Add error handling and recovery mechanisms throughout pipeline
     - Implement comprehensive logging and monitoring
@@ -151,7 +151,7 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - **Validates: Requirements 7.5**
 
 - [ ] 8. Implement Audio Enhancement Pipeline
-  - [~] 8.1 Create AudioEnhancer class for post-processing
+  - [ ] 8.1 Create AudioEnhancer class for post-processing
     - Implement noise reduction and audio clarity enhancement
     - Add volume normalization for consistent output levels
     - Create acoustic characteristic matching to reference audio
@@ -173,16 +173,16 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - **Property 19: Acoustic Characteristic Matching**
     - **Validates: Requirements 6.4**
   
-  - [~] 8.6 Add real-time streaming support for long texts
+  - [ ] 8.6 Add real-time streaming support for long texts
     - Implement chunked processing for texts over 200 words
     - Add streaming audio output to reduce perceived latency
     - _Requirements: 6.5_
 
-- [~] 9. Checkpoint - Ensure core TTS pipeline is functional
+- [ ] 9. Checkpoint - Ensure core TTS pipeline is functional
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 10. Implement Voice Quality Consistency Features
-  - [~] 10.1 Add cross-text-length quality validation
+  - [ ] 10.1 Add cross-text-length quality validation
     - Implement quality consistency checking across different text lengths (10-500 words)
     - Add variance tracking and quality degradation detection
     - _Requirements: 2.3_
@@ -191,7 +191,7 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - **Property 6: Voice Quality Consistency Across Text Lengths**
     - **Validates: Requirements 2.3**
   
-  - [~] 10.3 Implement reference text accuracy improvement
+  - [ ] 10.3 Implement reference text accuracy improvement
     - Add reference text integration to improve voice matching
     - Create text-audio alignment validation
     - _Requirements: 2.4, 8.4_
@@ -205,7 +205,7 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - **Validates: Requirements 8.4**
 
 - [ ] 11. Implement Reference Audio Management Tools
-  - [~] 11.1 Create reference audio preparation tools
+  - [ ] 11.1 Create reference audio preparation tools
     - Implement clean speech segment extraction from longer recordings
     - Add speech clarity analysis and optimal segment recommendation
     - Create quality feedback system with improvement suggestions
@@ -224,13 +224,13 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - **Validates: Requirements 8.5**
 
 - [ ] 12. Implement Monitoring and Diagnostics System
-  - [~] 12.1 Create HealthMonitor and AlertSystem classes
+  - [ ] 12.1 Create HealthMonitor and AlertSystem classes
     - Implement system health monitoring with backend availability checks
     - Add performance metrics tracking and trend analysis
     - Create alert system for quality degradation and error rate spikes
     - _Requirements: 7.1, 7.2, 7.3, 7.4_
   
-  - [~] 12.2 Add comprehensive diagnostics endpoints
+  - [ ] 12.2 Add comprehensive diagnostics endpoints
     - Create detailed system status reporting
     - Implement reference audio status validation
     - Add performance statistics and analytics dashboard data
@@ -242,13 +242,13 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
 - [ ] 13. Integration and API Updates
-  - [~] 13.1 Update existing TTS API endpoints
+  - [ ] 13.1 Update existing TTS API endpoints
     - Modify current `/tts` endpoint to use enhanced TTS server
     - Add new endpoints for quality validation and diagnostics
     - Maintain backward compatibility with existing web application
     - _Requirements: 5.3, 7.3_
   
-  - [~] 13.2 Add character configuration management endpoints
+  - [ ] 13.2 Add character configuration management endpoints
     - Create REST API for character parameter management
     - Add endpoints for reference audio upload and validation
     - Implement A/B testing configuration interface
@@ -261,13 +261,13 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - _Requirements: 5.1, 5.3, 5.5_
 
 - [ ] 14. Performance Optimization and Caching
-  - [~] 14.1 Optimize cache strategies and performance
+  - [ ] 14.1 Optimize cache strategies and performance
     - Fine-tune cache TTL and invalidation strategies
     - Implement cache warming for frequently requested characters
     - Add cache statistics and optimization recommendations
     - _Requirements: 5.4_
   
-  - [~] 14.2 Implement batch processing capabilities
+  - [ ] 14.2 Implement batch processing capabilities
     - Add support for batch voice generation requests
     - Optimize resource usage for concurrent processing
     - _Requirements: 5.5_
@@ -277,7 +277,7 @@ This implementation plan transforms the F5-TTS voice cloning system from a basic
     - Test batch processing performance and resource usage
     - _Requirements: 5.4, 5.5_
 
-- [~] 15. Final checkpoint and system validation
+- [ ] 15. Final checkpoint and system validation
   - Ensure all tests pass, ask the user if questions arise.
   - Validate complete system integration with existing EchoLegacy components
   - Verify all requirements are met through comprehensive testing
