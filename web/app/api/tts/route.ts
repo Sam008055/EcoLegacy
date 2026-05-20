@@ -286,13 +286,17 @@ export async function POST(req: Request) {
           if (blob.size >= 100) {
             const base64 = Buffer.from(await blob.arrayBuffer()).toString('base64');
             const audioUrl = `data:audio/wav;base64,${base64}`;
-            await supabase.from('audio_cache').insert({
-              cache_key: cacheKey,
-              character_id: id,
-              text,
-              audio_url: audioUrl,
-              successful_token_index: -1,
-            }).then(() => { }).catch(() => { });
+            try {
+              await supabase.from('audio_cache').insert({
+                cache_key: cacheKey,
+                character_id: id,
+                text,
+                audio_url: audioUrl,
+                successful_token_index: -1,
+              });
+            } catch (cacheErr) {
+              console.warn('[TTS] Failed to cache local response:', cacheErr);
+            }
             return NextResponse.json({ audioUrl, cached: false, source: 'local-reference' });
           }
         }
