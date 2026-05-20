@@ -1,0 +1,10 @@
+node_modules
+.next
+.env
+.env.*
+!.env.example
+.DS_Store
+dist
+out
+tts_cache
+*tts_cache*

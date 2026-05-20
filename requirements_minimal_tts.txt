@@ -1,0 +1,7 @@
+# Reference-audio TTS server — clones via HuggingFace F5 space + web/public/audio refs
+# (No local f5-tts install — saves ~2GB+ disk; needs HF token + quota)
+flask>=2.3.0
+flask-cors>=4.0.0
+gradio-client>=1.0.0
+python-dotenv>=1.0.0
+httpx>=0.27.0

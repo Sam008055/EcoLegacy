@@ -1,0 +1,33 @@
+# Enhanced F5-TTS Voice Cloning Server Requirements
+
+# Core dependencies for enhanced TTS server
+flask>=2.3.0
+flask-cors>=4.0.0
+python-dotenv>=1.0.0
+gradio-client>=0.8.0
+
+# Audio processing for quality validation
+librosa>=0.10.0
+soundfile>=0.12.0
+numpy>=1.24.0
+
+# Utilities
+requests>=2.31.0
+tqdm>=4.65.0
+scipy>=1.10.0
+
+# Optional: For production speaker verification (uncomment when ready)
+# torch>=2.0.0
+# torchaudio>=2.0.0
+# speechbrain>=0.5.0
+# resemblyzer>=0.1.0
+
+# Development and testing
+pytest>=7.0.0
+
+# Original TTS Libraries (for local fallback - optional)
+# TTS==0.22.0                    # Coqui XTTS (primary)
+# bark-voice-cloning>=0.0.1      # Bark TTS (backup)
+# edge-tts>=6.1.0               # Edge-TTS (CPU fallback)
+# accelerate>=0.20.0            # Memory optimization
+# transformers>=4.30.0          # Model loading optimization
