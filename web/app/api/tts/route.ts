@@ -224,10 +224,10 @@ export async function POST(req: Request) {
     if (userEmail && userEmail !== 'samarthpasalkar4@gmail.com') {
       try {
         const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-        const supabase = createClient(supabaseUrl, supabaseKey);
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!; // Always use service role key
+        const rateLimitSupabase = createClient(supabaseUrl, supabaseKey);
 
-        const { data: existingConvos, error: convoError } = await supabase
+        const { data: existingConvos, error: convoError } = await rateLimitSupabase
           .from('conversations')
           .select('character_id')
           .eq('session_id', userEmail);
@@ -273,10 +273,7 @@ export async function POST(req: Request) {
     }
 
     const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.SUPABASE_ANON_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!; // Always use service role key
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const cacheKey = `${id}_${text.trim().toLowerCase()}`;

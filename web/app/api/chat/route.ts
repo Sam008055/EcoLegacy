@@ -74,8 +74,12 @@ export async function POST(req: Request) {
     // RATE LIMITING LOGIC - STRICT ENFORCEMENT
     if (userEmail && !isAdmin) {
       try {
-        // Check existing conversations for this user
-        const { data: existingConvos, error: convoError } = await supabase
+        // Check existing conversations for this user - USE SERVICE ROLE KEY
+        const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!; // Always use service role key
+        const rateLimitSupabase = createClient(supabaseUrl, supabaseKey);
+
+        const { data: existingConvos, error: convoError } = await rateLimitSupabase
           .from('conversations')
           .select('character_id, created_at')
           .eq('session_id', userEmail)
@@ -153,7 +157,9 @@ export async function POST(req: Request) {
     let cacheError = null;
     
     try {
-      const cacheResult = await supabase
+      // Use service role key for cache queries too
+      const cacheSupabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+      const cacheResult = await cacheSupabase
         .from('cached_responses')
         .select('*')
         .eq('character_id', characterId)
@@ -187,7 +193,9 @@ export async function POST(req: Request) {
     let supabaseError = null;
     
     try {
-      const contextResult = await supabase.rpc('match_documents', {
+      // Use service role key for RAG queries too
+      const ragSupabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+      const contextResult = await ragSupabase.rpc('match_documents', {
         query_embedding: queryEmbedding,
         match_threshold: 0.2,
         match_count: 2,
@@ -239,7 +247,8 @@ ${contextText}`;
     // Cache the response for future use (async, don't wait)
     if (responseText) {
       try {
-        supabase.from('cached_responses').insert({
+        const cacheSupabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+        cacheSupabase.from('cached_responses').insert({
           character_id: characterId,
           question: query.trim().toLowerCase(),
           answer_text: responseText
@@ -255,7 +264,8 @@ ${contextText}`;
     // Log conversation to track usage
     if (userEmail) {
       try {
-        supabase.from('conversations').insert({
+        const logSupabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+        logSupabase.from('conversations').insert({
           session_id: userEmail,
           character_id: characterId,
           user_message: query,
