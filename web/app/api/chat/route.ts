@@ -71,52 +71,54 @@ export async function POST(req: Request) {
     const ADMIN_EMAIL = 'samarthpasalkar4@gmail.com';
     const isAdmin = userEmail === ADMIN_EMAIL;
 
-    // 🚫 HARDCORE RATE LIMITING - ABSOLUTELY BLOCK USERS AFTER 2 CONVERSATIONS
+    // 🚫 NUCLEAR RATE LIMITING - IN-MEMORY (NO DATABASE DEPENDENCY)
     if (userEmail && !isAdmin) {
-      console.log(`[CHAT] 🔍 Checking rate limit for user: ${userEmail}`);
+      console.log(`[CHAT] 🔍 NUCLEAR rate limit check for: ${userEmail}`);
       
-      // Count existing conversations
-      const { data: existingConvos, error: countError } = await supabase
-        .from('conversations')
-        .select('id, character_id, created_at')
-        .eq('session_id', userEmail)
-        .order('created_at', { ascending: true });
+      try {
+        // Check rate limit via in-memory API
+        const rateLimitResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://eco-legacy-alpha.vercel.app'}/api/rate-limit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            userEmail, 
+            characterId, 
+            action: 'check' 
+          })
+        });
 
-      if (countError) {
-        console.error('[CHAT] 💥 Rate limit check failed:', countError);
-        // If we can't check rate limit, BLOCK to be safe
+        const rateLimitData = await rateLimitResponse.json();
+        
+        if (!rateLimitData.allowed) {
+          console.log(`[CHAT] � NUCLEAR BLOCK: ${rateLimitData.reason} for ${userEmail}`);
+          
+          if (rateLimitData.reason === 'rate_limit_exceeded') {
+            return NextResponse.json({ 
+              error: 'RATE_LIMIT_REACHED', 
+              message: rateLimitData.message
+            }, { status: 429 });
+          }
+          
+          if (rateLimitData.reason === 'character_locked') {
+            return NextResponse.json({ 
+              error: 'CHARACTER_LOCKED', 
+              message: rateLimitData.message,
+              lockedCharacter: rateLimitData.lockedCharacter
+            }, { status: 403 });
+          }
+        }
+
+        interactionsCount = rateLimitData.nextCount || 1;
+        console.log(`[CHAT] ✅ NUCLEAR ALLOWED - User ${userEmail} interaction ${interactionsCount}/2`);
+
+      } catch (rateLimitError) {
+        console.error('[CHAT] 💥 Nuclear rate limit failed:', rateLimitError);
+        // If nuclear rate limit fails, BLOCK to be safe
         return NextResponse.json({ 
           error: 'SERVICE_UNAVAILABLE', 
           message: 'Unable to verify usage limits. Please try again later.' 
         }, { status: 503 });
       }
-
-      const conversationCount = existingConvos?.length || 0;
-      console.log(`[CHAT] 📊 User ${userEmail} has ${conversationCount} conversations`);
-
-      // Character locking - must use same character as first conversation
-      if (conversationCount > 0) {
-        const firstCharacter = existingConvos[0].character_id;
-        if (firstCharacter !== characterId) {
-          console.log(`[CHAT] 🔒 Character locked! User tried ${characterId}, locked to ${firstCharacter}`);
-          return NextResponse.json({ 
-            error: 'CHARACTER_LOCKED', 
-            message: `You can only interact with ${firstCharacter}. Please go back and select that character.`
-          }, { status: 403 });
-        }
-      }
-
-      // HARD LIMIT: Block after 2 conversations
-      if (conversationCount >= 2) {
-        console.log(`[CHAT] 🚫 BLOCKED! User ${userEmail} has ${conversationCount} conversations (limit: 2)`);
-        return NextResponse.json({ 
-          error: 'RATE_LIMIT_REACHED', 
-          message: 'You have used your 2 free interactions. Please share feedback to help us improve!' 
-        }, { status: 429 });
-      }
-
-      interactionsCount = conversationCount + 1;
-      console.log(`[CHAT] ✅ ALLOWED - User ${userEmail} interaction ${interactionsCount}/2`);
     }
 
     console.log('[CHAT] Checking cache for quick response...');
@@ -225,6 +227,24 @@ ${contextText}`;
         });
       } catch (err) {
         console.warn('[CHAT] Cache insert failed:', err);
+      }
+    }
+
+    // Increment nuclear rate limiter AFTER successful response
+    if (userEmail && !isAdmin) {
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://eco-legacy-alpha.vercel.app'}/api/rate-limit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            userEmail, 
+            characterId, 
+            action: 'increment' 
+          })
+        });
+        console.log(`[CHAT] ✅ Nuclear rate limit incremented for ${userEmail}`);
+      } catch (err) {
+        console.warn('[CHAT] Failed to increment nuclear rate limit:', err);
       }
     }
 
