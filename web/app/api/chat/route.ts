@@ -73,54 +73,72 @@ export async function POST(req: Request) {
 
     // RATE LIMITING LOGIC - STRICT ENFORCEMENT
     if (userEmail && !isAdmin) {
-      // Check existing conversations for this user
-      const { data: existingConvos, error: convoError } = await supabase
-        .from('conversations')
-        .select('character_id, created_at')
-        .eq('session_id', userEmail)
-        .order('created_at', { ascending: true });
+      try {
+        // Check existing conversations for this user
+        const { data: existingConvos, error: convoError } = await supabase
+          .from('conversations')
+          .select('character_id, created_at')
+          .eq('session_id', userEmail)
+          .order('created_at', { ascending: true });
 
-      if (convoError) {
-        console.error('[CHAT] Error checking conversations:', convoError);
-        return NextResponse.json({ error: 'Database error' }, { status: 500 });
-      }
+        if (convoError) {
+          console.error('[CHAT] Supabase conversation query error:', convoError);
+          // Continue without rate limiting if database fails (graceful degradation)
+          console.log('[CHAT] Continuing without rate limiting due to database error');
+        } else {
+          const convos = existingConvos || [];
+          console.log(`[CHAT] User ${userEmail} has ${convos.length} existing conversations`);
 
-      const convos = existingConvos || [];
-      console.log(`[CHAT] User ${userEmail} has ${convos.length} existing conversations`);
+          // 1. Check if user is trying a different character than their first one
+          if (convos.length > 0) {
+            const firstCharacter = convos[0].character_id;
+            if (firstCharacter !== characterId) {
+              console.log(`[CHAT] Character locked for ${userEmail}. Locked to: ${firstCharacter}, tried: ${characterId}`);
+              return NextResponse.json({ 
+                error: 'CHARACTER_LOCKED', 
+                message: `You can only interact with one character. You're locked to your first choice: ${firstCharacter}`,
+                lockedCharacter: firstCharacter
+              }, { status: 403 });
+            }
+          }
 
-      // 1. Check if user is trying a different character than their first one
-      if (convos.length > 0) {
-        const firstCharacter = convos[0].character_id;
-        if (firstCharacter !== characterId) {
-          console.log(`[CHAT] Character locked for ${userEmail}. Locked to: ${firstCharacter}, tried: ${characterId}`);
-          return NextResponse.json({ 
-            error: 'CHARACTER_LOCKED', 
-            message: `You can only interact with one character. You're locked to your first choice: ${firstCharacter}`,
-            lockedCharacter: firstCharacter
-          }, { status: 403 });
+          // 2. STRICT: Check if user has used up their 2 free queries
+          if (convos.length >= 2) {
+            console.log(`[CHAT] RATE LIMIT ENFORCED for ${userEmail}. Count: ${convos.length}`);
+            return NextResponse.json({ 
+              error: 'RATE_LIMIT_REACHED', 
+              message: 'You have reached the maximum of 2 free interactions. Please share your feedback to help us improve!' 
+            }, { status: 429 });
+          }
+          
+          interactionsCount = convos.length + 1; // Including the current query
+          console.log(`[CHAT] User ${userEmail} interaction ${interactionsCount}/2`);
         }
+      } catch (dbError) {
+        console.error('[CHAT] Database connection error:', dbError);
+        // Continue without rate limiting if database is completely unavailable
+        console.log('[CHAT] Continuing without rate limiting due to database connection error');
       }
-
-      // 2. STRICT: Check if user has used up their 2 free queries
-      if (convos.length >= 2) {
-        console.log(`[CHAT] RATE LIMIT ENFORCED for ${userEmail}. Count: ${convos.length}`);
-        return NextResponse.json({ 
-          error: 'RATE_LIMIT_REACHED', 
-          message: 'You have reached the maximum of 2 free interactions. Please share your feedback to help us improve!' 
-        }, { status: 429 });
-      }
-      
-      interactionsCount = convos.length + 1; // Including the current query
-      console.log(`[CHAT] User ${userEmail} interaction ${interactionsCount}/2`);
     }
 
     console.log('[CHAT] Checking cache for quick response...');
-    const { data: cachedResponse, error: cacheError } = await supabase
-      .from('cached_responses')
-      .select('*')
-      .eq('character_id', characterId)
-      .eq('question', query.trim().toLowerCase())
-      .single();
+    let cachedResponse = null;
+    let cacheError = null;
+    
+    try {
+      const cacheResult = await supabase
+        .from('cached_responses')
+        .select('*')
+        .eq('character_id', characterId)
+        .eq('question', query.trim().toLowerCase())
+        .single();
+      
+      cachedResponse = cacheResult.data;
+      cacheError = cacheResult.error;
+    } catch (err) {
+      console.warn('[CHAT] Cache query failed:', err);
+      cacheError = err;
+    }
 
     if (cachedResponse && !cacheError) {
       console.log('[CHAT] Cache hit! Returning cached response');
@@ -138,12 +156,23 @@ export async function POST(req: Request) {
     const queryEmbedding = await generateEmbedding(query);
     
     console.log(`[CHAT] Searching for context (${character.name})...`);
-    const { data: contextChunks, error: supabaseError } = await supabase.rpc('match_documents', {
-      query_embedding: queryEmbedding,
-      match_threshold: 0.2,
-      match_count: 2,
-      p_character_id: character.id
-    });
+    let contextChunks = null;
+    let supabaseError = null;
+    
+    try {
+      const contextResult = await supabase.rpc('match_documents', {
+        query_embedding: queryEmbedding,
+        match_threshold: 0.2,
+        match_count: 2,
+        p_character_id: character.id
+      });
+      
+      contextChunks = contextResult.data;
+      supabaseError = contextResult.error;
+    } catch (err) {
+      console.warn('[CHAT] Context search failed:', err);
+      supabaseError = err;
+    }
 
     if (supabaseError) {
       console.error('[CHAT] Supabase Error:', supabaseError);
@@ -181,14 +210,18 @@ ${contextText}`;
     console.log('[CHAT] Generated text:', responseText);
 
     // Cache the response for future use (async, don't wait)
-    supabase.from('cached_responses').insert({
-      character_id: characterId,
-      question: query.trim().toLowerCase(),
-      answer_text: responseText
-    }).then(({ error }) => {
-      if (error) console.warn('[CHAT] Failed to cache response:', error);
-      else console.log('[CHAT] Response cached for future use');
-    });
+    if (responseText) {
+      supabase.from('cached_responses').insert({
+        character_id: characterId,
+        question: query.trim().toLowerCase(),
+        answer_text: responseText
+      }).then(({ error }) => {
+        if (error) console.warn('[CHAT] Failed to cache response:', error);
+        else console.log('[CHAT] Response cached for future use');
+      }).catch(err => {
+        console.warn('[CHAT] Cache insert failed:', err);
+      });
+    }
 
     // Log conversation to track usage
     if (userEmail) {
@@ -199,6 +232,8 @@ ${contextText}`;
         avatar_response: responseText
       }).then(({ error }) => {
         if (error) console.warn('[CHAT] Failed to log conversation:', error);
+      }).catch(err => {
+        console.warn('[CHAT] Conversation logging failed:', err);
       });
     }
 
