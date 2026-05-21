@@ -71,15 +71,22 @@ export async function POST(req: Request) {
     const ADMIN_EMAIL = 'samarthpasalkar4@gmail.com';
     const isAdmin = userEmail === ADMIN_EMAIL;
 
-    // RATE LIMITING LOGIC
+    // RATE LIMITING LOGIC - STRICT ENFORCEMENT
     if (userEmail && !isAdmin) {
       // Check existing conversations for this user
-      const { data: existingConvos } = await supabase
+      const { data: existingConvos, error: convoError } = await supabase
         .from('conversations')
-        .select('character_id')
-        .eq('session_id', userEmail);
+        .select('character_id, created_at')
+        .eq('session_id', userEmail)
+        .order('created_at', { ascending: true });
+
+      if (convoError) {
+        console.error('[CHAT] Error checking conversations:', convoError);
+        return NextResponse.json({ error: 'Database error' }, { status: 500 });
+      }
 
       const convos = existingConvos || [];
+      console.log(`[CHAT] User ${userEmail} has ${convos.length} existing conversations`);
 
       // 1. Check if user is trying a different character than their first one
       if (convos.length > 0) {
@@ -88,22 +95,23 @@ export async function POST(req: Request) {
           console.log(`[CHAT] Character locked for ${userEmail}. Locked to: ${firstCharacter}, tried: ${characterId}`);
           return NextResponse.json({ 
             error: 'CHARACTER_LOCKED', 
-            message: `You can only interact with one character. You're locked to your first choice.`,
+            message: `You can only interact with one character. You're locked to your first choice: ${firstCharacter}`,
             lockedCharacter: firstCharacter
           }, { status: 403 });
         }
       }
 
-      // 2. Check if user has used up their 2 free queries
+      // 2. STRICT: Check if user has used up their 2 free queries
       if (convos.length >= 2) {
-        console.log(`[CHAT] Rate limit reached for ${userEmail}. Count: ${convos.length}`);
+        console.log(`[CHAT] RATE LIMIT ENFORCED for ${userEmail}. Count: ${convos.length}`);
         return NextResponse.json({ 
           error: 'RATE_LIMIT_REACHED', 
-          message: 'You have reached the maximum of 2 free interactions. Please share your feedback!' 
+          message: 'You have reached the maximum of 2 free interactions. Please share your feedback to help us improve!' 
         }, { status: 429 });
       }
       
       interactionsCount = convos.length + 1; // Including the current query
+      console.log(`[CHAT] User ${userEmail} interaction ${interactionsCount}/2`);
     }
 
     console.log('[CHAT] Checking cache for quick response...');

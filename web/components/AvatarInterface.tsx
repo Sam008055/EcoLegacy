@@ -119,7 +119,7 @@ export default function AvatarInterface({ user, characterId }: { user: any, char
       const ttsRes = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: responseText, characterId })
+        body: JSON.stringify({ text: responseText, characterId, userEmail: user.email })
       })
       const ttsData = await ttsRes.json()
 

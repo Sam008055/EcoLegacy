@@ -205,7 +205,7 @@ async function generateWithReferenceVoice(
 
 export async function POST(req: Request) {
   try {
-    const { text, characterId } = await req.json();
+    const { text, characterId, userEmail } = await req.json();
 
     if (!text) {
       return NextResponse.json({ error: 'Text is required' }, { status: 400 });
@@ -213,6 +213,27 @@ export async function POST(req: Request) {
 
     const id = (characterId as CharacterId) in characters ? (characterId as CharacterId) : 'osho';
     const character = characters[id];
+
+    // RATE LIMITING FOR TTS - Prevent direct API abuse
+    if (userEmail && userEmail !== 'samarthpasalkar4@gmail.com') {
+      const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
+
+      const { data: existingConvos } = await supabase
+        .from('conversations')
+        .select('character_id')
+        .eq('session_id', userEmail);
+
+      const convos = existingConvos || [];
+      if (convos.length >= 2) {
+        console.log(`[TTS] Rate limit enforced for ${userEmail}. Conversations: ${convos.length}`);
+        return NextResponse.json({ 
+          error: 'RATE_LIMIT_REACHED', 
+          message: 'You have reached the maximum of 2 free interactions. Please share your feedback!' 
+        }, { status: 429 });
+      }
+    }
 
     const referenceAudioPath = getReferenceAudioPath(id);
     if (!fs.existsSync(referenceAudioPath)) {
