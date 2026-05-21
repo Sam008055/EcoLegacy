@@ -11,11 +11,11 @@ const SMALLEST_API_BASE = 'https://api.smallest.ai/waves/v1';
 
 // Store voice IDs for each character (pre-created voice clones)
 const CHARACTER_VOICE_IDS: Record<string, string> = {
-  osho: 'osho_voice_clone_id', // Replace with actual voice ID from smallest.ai
-  bhagat_singh: 'bhagat_voice_clone_id',
-  ssr: 'ssr_voice_clone_id', 
-  tesla: 'tesla_voice_clone_id',
-  hitler: 'hitler_voice_clone_id'
+  osho: 'voice_SlEiKoRgNX',
+  bhagat_singh: 'voice_k1KX1wW56a',
+  ssr: 'voice_OdTNncyyNP',
+  tesla: 'voice_RrcezTCRAl',
+  hitler: 'voice_TGaoN2HRlM',
 };
 
 function getHfTokens(): string[] {
@@ -104,20 +104,25 @@ async function generateWithSmallestAI(
     throw new Error('SMALLEST_API_KEY not configured in environment');
   }
 
-  // Use pre-created voice ID or create new one
+  // Use pre-created voice ID - SKIP CLONE CREATION FOR SPEED
   let voiceId: string | null = CHARACTER_VOICE_IDS[characterId] || null;
   
-  // If no pre-created voice ID, create one (but this should be done once manually)
-  if (!voiceId || voiceId.includes('_clone_id')) {
-    console.log(`[TTS] No pre-created voice ID for ${characterId}, creating new one...`);
+  // Only create voice clone if we don't have a real voice ID (contains placeholder text)
+  if (!voiceId || voiceId.includes('_clone_id') || voiceId.includes('voice_clone_id')) {
+    console.log(`[TTS] ⚠️  No valid voice ID for ${characterId}, creating new one (this will be slow)...`);
     voiceId = await createVoiceClone(characterId, referenceAudioPath);
     if (!voiceId) {
       throw new Error(`Failed to create voice clone for ${characterId}`);
     }
+    console.log(`[TTS] ✅ Created voice ID for ${characterId}: ${voiceId}`);
+    console.log(`[TTS] 💡 Add this to CHARACTER_VOICE_IDS: ${characterId}: '${voiceId}'`);
+  } else {
+    console.log(`[TTS] 🚀 Using pre-created voice ID for ${characterId}: ${voiceId}`);
   }
 
   try {
     console.log(`[TTS] Generating speech with smallest.ai voice ${voiceId}`);
+    const startTime = Date.now();
 
     const response = await fetch(`${SMALLEST_API_BASE}/lightning-v3.1/get_speech`, {
       method: 'POST',
@@ -139,7 +144,8 @@ async function generateWithSmallestAI(
       const audioBuffer = await response.arrayBuffer();
       const base64Audio = Buffer.from(audioBuffer).toString('base64');
       const audioUrl = `data:audio/wav;base64,${base64Audio}`;
-      console.log(`[TTS] Speech generated successfully (${audioBuffer.byteLength} bytes)`);
+      const duration = Date.now() - startTime;
+      console.log(`[TTS] ✅ Speech generated successfully in ${duration}ms (${audioBuffer.byteLength} bytes)`);
       return { audioUrl, source: 'smallest-ai' };
     } else {
       const errorText = await response.text();
