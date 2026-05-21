@@ -43,9 +43,9 @@ export async function POST(req: Request) {
     const character = characters[characterId as CharacterId] || characters.osho;
     console.log('[CHAT] Character selected:', character.name);
 
-    // Check environment variables - USE SERVICE ROLE KEY TO BYPASS RLS
+    // Check environment variables
     const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // Force service role key
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     const groqKey = process.env.GROQ_API_KEY;
 
     console.log('[CHAT] Environment check:', {
@@ -71,52 +71,85 @@ export async function POST(req: Request) {
     const ADMIN_EMAIL = 'samarthpasalkar4@gmail.com';
     const isAdmin = userEmail === ADMIN_EMAIL;
 
-    // 🚫 HARDCORE RATE LIMITING - ABSOLUTELY BLOCK USERS AFTER 2 CONVERSATIONS
+    // RATE LIMITING LOGIC - STRICT ENFORCEMENT
     if (userEmail && !isAdmin) {
-      console.log(`[CHAT] 🔍 Checking rate limit for user: ${userEmail}`);
-      
-      // Count existing conversations
-      const { data: existingConvos, error: countError } = await supabase
-        .from('conversations')
-        .select('id, character_id, created_at')
-        .eq('session_id', userEmail)
-        .order('created_at', { ascending: true });
+      try {
+        // Check existing conversations for this user - USE SERVICE ROLE KEY
+        const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!; // Always use service role key
+        const rateLimitSupabase = createClient(supabaseUrl, supabaseKey);
 
-      if (countError) {
-        console.error('[CHAT] 💥 Rate limit check failed:', countError);
-        // If we can't check rate limit, BLOCK to be safe
-        return NextResponse.json({ 
-          error: 'SERVICE_UNAVAILABLE', 
-          message: 'Unable to verify usage limits. Please try again later.' 
-        }, { status: 503 });
-      }
+        const { data: existingConvos, error: convoError } = await rateLimitSupabase
+          .from('conversations')
+          .select('character_id, created_at')
+          .eq('session_id', userEmail)
+          .order('created_at', { ascending: true });
 
-      const conversationCount = existingConvos?.length || 0;
-      console.log(`[CHAT] 📊 User ${userEmail} has ${conversationCount} conversations`);
+        if (convoError) {
+          console.error('[CHAT] Supabase conversation query error:', JSON.stringify(convoError, null, 2));
+          console.error('[CHAT] Supabase URL:', supabaseUrl ? 'SET' : 'MISSING');
+          console.error('[CHAT] Supabase Key:', supabaseKey ? 'SET' : 'MISSING');
+          
+          // Check if it's a specific database error we can handle
+          if (convoError.code === 'PGRST116' || convoError.message?.includes('relation') || convoError.message?.includes('does not exist')) {
+            console.log('[CHAT] Table does not exist, allowing request to continue');
+            // Table doesn't exist yet, allow the request (first time setup)
+          } else {
+            // Other database errors - block to prevent abuse
+            return NextResponse.json({ 
+              error: 'SERVICE_UNAVAILABLE', 
+              message: 'Service temporarily unavailable. Please try again later.',
+              details: convoError.message 
+            }, { status: 503 });
+          }
+        }
 
-      // Character locking - must use same character as first conversation
-      if (conversationCount > 0) {
-        const firstCharacter = existingConvos[0].character_id;
-        if (firstCharacter !== characterId) {
-          console.log(`[CHAT] 🔒 Character locked! User tried ${characterId}, locked to ${firstCharacter}`);
+        const convos = existingConvos || [];
+        console.log(`[CHAT] User ${userEmail} has ${convos.length} existing conversations`);
+
+        // 1. Check if user is trying a different character than their first one
+        if (convos.length > 0) {
+          const firstCharacter = convos[0].character_id;
+          if (firstCharacter !== characterId) {
+            console.log(`[CHAT] Character locked for ${userEmail}. Locked to: ${firstCharacter}, tried: ${characterId}`);
+            return NextResponse.json({ 
+              error: 'CHARACTER_LOCKED', 
+              message: `You can only interact with one character. You're locked to your first choice: ${firstCharacter}`,
+              lockedCharacter: firstCharacter
+            }, { status: 403 });
+          }
+        }
+
+        // 2. STRICT: Check if user has used up their 2 free queries
+        if (convos.length >= 2) {
+          console.log(`[CHAT] RATE LIMIT ENFORCED for ${userEmail}. Count: ${convos.length}`);
           return NextResponse.json({ 
-            error: 'CHARACTER_LOCKED', 
-            message: `You can only interact with ${firstCharacter}. Please go back and select that character.`
-          }, { status: 403 });
+            error: 'RATE_LIMIT_REACHED', 
+            message: 'You have reached the maximum of 2 free interactions. Please share your feedback to help us improve!' 
+          }, { status: 429 });
+        }
+        
+        interactionsCount = convos.length + 1; // Including the current query
+        console.log(`[CHAT] User ${userEmail} interaction ${interactionsCount}/2`);
+
+      } catch (dbError: any) {
+        console.error('[CHAT] Database connection error:', JSON.stringify(dbError, null, 2));
+        console.error('[CHAT] Error message:', dbError.message);
+        console.error('[CHAT] Error code:', dbError.code);
+        
+        // Check if it's a table/schema issue we can handle
+        if (dbError.message?.includes('relation') || dbError.message?.includes('does not exist') || dbError.code === 'PGRST116') {
+          console.log('[CHAT] Database schema issue, allowing request to continue');
+          // Allow the request to continue for first-time setup
+        } else {
+          // Other connection errors - block to prevent abuse
+          return NextResponse.json({ 
+            error: 'SERVICE_UNAVAILABLE', 
+            message: 'Service temporarily unavailable. Please try again later.',
+            details: dbError.message 
+          }, { status: 503 });
         }
       }
-
-      // HARD LIMIT: Block after 2 conversations
-      if (conversationCount >= 2) {
-        console.log(`[CHAT] 🚫 BLOCKED! User ${userEmail} has ${conversationCount} conversations (limit: 2)`);
-        return NextResponse.json({ 
-          error: 'RATE_LIMIT_REACHED', 
-          message: 'You have used your 2 free interactions. Please share feedback to help us improve!' 
-        }, { status: 429 });
-      }
-
-      interactionsCount = conversationCount + 1;
-      console.log(`[CHAT] ✅ ALLOWED - User ${userEmail} interaction ${interactionsCount}/2`);
     }
 
     console.log('[CHAT] Checking cache for quick response...');
@@ -231,9 +264,10 @@ ${contextText}`;
     // Log conversation to track usage - CRITICAL for rate limiting
     if (userEmail) {
       try {
-        console.log(`[CHAT] 💾 Logging conversation for ${userEmail} with character ${characterId}`);
+        const logSupabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+        console.log(`[CHAT] Logging conversation for ${userEmail} with character ${characterId}`);
         
-        const { data, error } = await supabase.from('conversations').insert({
+        const { data, error } = await logSupabase.from('conversations').insert({
           session_id: userEmail,
           character_id: characterId,
           user_message: query,
@@ -241,13 +275,13 @@ ${contextText}`;
         });
         
         if (error) {
-          console.error('[CHAT] 💥 CRITICAL: Failed to log conversation:', JSON.stringify(error, null, 2));
+          console.error('[CHAT] CRITICAL: Failed to log conversation:', JSON.stringify(error, null, 2));
           console.error('[CHAT] This will break rate limiting!');
         } else {
           console.log('[CHAT] ✅ Conversation logged successfully for rate limiting');
         }
       } catch (err) {
-        console.error('[CHAT] 💥 CRITICAL: Conversation logging exception:', err);
+        console.error('[CHAT] CRITICAL: Conversation logging exception:', err);
       }
     }
 
