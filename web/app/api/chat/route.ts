@@ -211,30 +211,34 @@ ${contextText}`;
 
     // Cache the response for future use (async, don't wait)
     if (responseText) {
-      supabase.from('cached_responses').insert({
-        character_id: characterId,
-        question: query.trim().toLowerCase(),
-        answer_text: responseText
-      }).then(({ error }) => {
-        if (error) console.warn('[CHAT] Failed to cache response:', error);
-        else console.log('[CHAT] Response cached for future use');
-      }).catch(err => {
+      try {
+        supabase.from('cached_responses').insert({
+          character_id: characterId,
+          question: query.trim().toLowerCase(),
+          answer_text: responseText
+        }).then(({ error }) => {
+          if (error) console.warn('[CHAT] Failed to cache response:', error);
+          else console.log('[CHAT] Response cached for future use');
+        });
+      } catch (err) {
         console.warn('[CHAT] Cache insert failed:', err);
-      });
+      }
     }
 
     // Log conversation to track usage
     if (userEmail) {
-      supabase.from('conversations').insert({
-        session_id: userEmail,
-        character_id: characterId,
-        user_message: query,
-        avatar_response: responseText
-      }).then(({ error }) => {
-        if (error) console.warn('[CHAT] Failed to log conversation:', error);
-      }).catch(err => {
+      try {
+        supabase.from('conversations').insert({
+          session_id: userEmail,
+          character_id: characterId,
+          user_message: query,
+          avatar_response: responseText
+        }).then(({ error }) => {
+          if (error) console.warn('[CHAT] Failed to log conversation:', error);
+        });
+      } catch (err) {
         console.warn('[CHAT] Conversation logging failed:', err);
-      });
+      }
     }
 
     return NextResponse.json({ 
