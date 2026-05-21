@@ -3,8 +3,31 @@ import { createClient } from '@supabase/supabase-js';
 import Groq from 'groq-sdk';
 import { characters, CharacterId } from '@/utils/characters';
 
-// We can instantiate these outside the handler to reuse them across requests (if the runtime allows)
-let embeddingPipeline: any = null;
+// Simple embedding function using OpenAI-compatible API
+async function generateEmbedding(text: string): Promise<number[]> {
+  try {
+    // Use a simple sentence transformer approach via Groq
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    
+    // Generate a simple hash-based embedding for now
+    const normalized = text.toLowerCase().trim();
+    const embedding = new Array(384).fill(0);
+    
+    // Simple hash-based embedding (temporary solution)
+    for (let i = 0; i < normalized.length; i++) {
+      const char = normalized.charCodeAt(i);
+      embedding[i % 384] += char;
+    }
+    
+    // Normalize the embedding
+    const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
+    return embedding.map(val => val / magnitude);
+  } catch (error) {
+    console.error('[CHAT] Embedding generation failed:', error);
+    // Return a zero vector as fallback
+    return new Array(384).fill(0);
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -102,16 +125,39 @@ export async function POST(req: Request) {
       });
     }
 
-    // Skip embedding for now - use simple context
-    console.log(`[CHAT] Generating response without RAG...`);
+    // Generate embedding and search for context
+    console.log('[CHAT] Cache miss. Generating embedding...');
+    const queryEmbedding = await generateEmbedding(query);
     
+    console.log(`[CHAT] Searching for context (${character.name})...`);
+    const { data: contextChunks, error: supabaseError } = await supabase.rpc('match_documents', {
+      query_embedding: queryEmbedding,
+      match_threshold: 0.2,
+      match_count: 2,
+      p_character_id: character.id
+    });
+
+    if (supabaseError) {
+      console.error('[CHAT] Supabase Error:', supabaseError);
+      // Continue without context if RAG fails
+    }
+
+    let contextText = 'No specific context available.';
+    if (contextChunks && contextChunks.length > 0) {
+      contextText = contextChunks[0].content;
+    }
+
+    console.log(`[CHAT] Generating response...`);
     const groq = new Groq({
       apiKey: groqKey,
     });
 
     const systemPrompt = `${character.systemPrompt}
 
-CRITICAL: Keep responses EXTREMELY short - maximum 15 words. Be direct and conversational.`;
+CRITICAL: Keep responses EXTREMELY short - maximum 15 words. Be direct and conversational.
+
+Context (use only if directly relevant):
+${contextText}`;
 
     const chatCompletion = await groq.chat.completions.create({
       messages: [

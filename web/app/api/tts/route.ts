@@ -9,8 +9,14 @@ import { extractGradioAudioPath } from '@/utils/gradioAudio';
 const HF_SPACE = 'chenxie95/Cross-Lingual_F5-TTS_Space';
 const SMALLEST_API_BASE = 'https://api.smallest.ai/waves/v1';
 
-// Store voice IDs for each character (will be created on first use)
-const CHARACTER_VOICE_IDS: Record<string, string> = {};
+// Store voice IDs for each character (pre-created voice clones)
+const CHARACTER_VOICE_IDS: Record<string, string> = {
+  osho: 'osho_voice_clone_id', // Replace with actual voice ID from smallest.ai
+  bhagat_singh: 'bhagat_voice_clone_id',
+  ssr: 'ssr_voice_clone_id', 
+  tesla: 'tesla_voice_clone_id',
+  hitler: 'hitler_voice_clone_id'
+};
 
 function getHfTokens(): string[] {
   return [
@@ -98,9 +104,12 @@ async function generateWithSmallestAI(
     throw new Error('SMALLEST_API_KEY not configured in environment');
   }
 
-  // Get or create voice ID
+  // Use pre-created voice ID or create new one
   let voiceId: string | null = CHARACTER_VOICE_IDS[characterId] || null;
-  if (!voiceId) {
+  
+  // If no pre-created voice ID, create one (but this should be done once manually)
+  if (!voiceId || voiceId.includes('_clone_id')) {
+    console.log(`[TTS] No pre-created voice ID for ${characterId}, creating new one...`);
     voiceId = await createVoiceClone(characterId, referenceAudioPath);
     if (!voiceId) {
       throw new Error(`Failed to create voice clone for ${characterId}`);
