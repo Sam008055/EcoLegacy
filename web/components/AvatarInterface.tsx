@@ -175,8 +175,8 @@ export default function AvatarInterface({ user, characterId }: { user: any, char
         console.warn('Video animation failed, falling back to audio only.', vidErr)
       }
 
-      // Automatically display feedback popup after 2nd interaction for non-admins
-      if (chatData.interactionsCount === 2 && !chatData.isAdmin) {
+      // Automatically display feedback popup after 1st interaction for non-admins
+      if (chatData.interactionsCount === 1 && !chatData.isAdmin) {
         setTimeout(() => setIsFeedbackOpen(true), 2000)
       }
 

@@ -233,20 +233,30 @@ export async function POST(req: Request) {
           .eq('session_id', userEmail);
 
         if (convoError) {
-          console.warn(`[TTS] Database error checking rate limit for ${userEmail}:`, convoError);
-          // Continue without rate limiting if database fails
-        } else {
-          const convos = existingConvos || [];
-          if (convos.length >= 2) {
-            console.log(`[TTS] Rate limit enforced for ${userEmail}. Conversations: ${convos.length}`);
-            return NextResponse.json({ 
-              error: 'RATE_LIMIT_REACHED', 
-              message: 'You have reached the maximum of 2 free interactions. Please share your feedback!' 
-            }, { status: 429 });
-          }
+          console.error(`[TTS] Database error checking rate limit for ${userEmail}:`, convoError);
+          // STRICT: Block if database fails to prevent abuse
+          return NextResponse.json({ 
+            error: 'SERVICE_UNAVAILABLE', 
+            message: 'Service temporarily unavailable. Please try again later.' 
+          }, { status: 503 });
         }
+
+        const convos = existingConvos || [];
+        if (convos.length >= 2) {
+          console.log(`[TTS] Rate limit enforced for ${userEmail}. Conversations: ${convos.length}`);
+          return NextResponse.json({ 
+            error: 'RATE_LIMIT_REACHED', 
+            message: 'You have reached the maximum of 2 free interactions. Please share your feedback!' 
+          }, { status: 429 });
+        }
+
       } catch (dbError) {
-        console.warn('[TTS] Database connection error, continuing without rate limiting:', dbError);
+        console.error('[TTS] Database connection error:', dbError);
+        // STRICT: Block if database is completely unavailable
+        return NextResponse.json({ 
+          error: 'SERVICE_UNAVAILABLE', 
+          message: 'Service temporarily unavailable. Please try again later.' 
+        }, { status: 503 });
       }
     }
 

@@ -83,41 +83,48 @@ export async function POST(req: Request) {
 
         if (convoError) {
           console.error('[CHAT] Supabase conversation query error:', convoError);
-          // Continue without rate limiting if database fails (graceful degradation)
-          console.log('[CHAT] Continuing without rate limiting due to database error');
-        } else {
-          const convos = existingConvos || [];
-          console.log(`[CHAT] User ${userEmail} has ${convos.length} existing conversations`);
-
-          // 1. Check if user is trying a different character than their first one
-          if (convos.length > 0) {
-            const firstCharacter = convos[0].character_id;
-            if (firstCharacter !== characterId) {
-              console.log(`[CHAT] Character locked for ${userEmail}. Locked to: ${firstCharacter}, tried: ${characterId}`);
-              return NextResponse.json({ 
-                error: 'CHARACTER_LOCKED', 
-                message: `You can only interact with one character. You're locked to your first choice: ${firstCharacter}`,
-                lockedCharacter: firstCharacter
-              }, { status: 403 });
-            }
-          }
-
-          // 2. STRICT: Check if user has used up their 2 free queries
-          if (convos.length >= 2) {
-            console.log(`[CHAT] RATE LIMIT ENFORCED for ${userEmail}. Count: ${convos.length}`);
-            return NextResponse.json({ 
-              error: 'RATE_LIMIT_REACHED', 
-              message: 'You have reached the maximum of 2 free interactions. Please share your feedback to help us improve!' 
-            }, { status: 429 });
-          }
-          
-          interactionsCount = convos.length + 1; // Including the current query
-          console.log(`[CHAT] User ${userEmail} interaction ${interactionsCount}/2`);
+          // STRICT: If database fails, block the user to prevent abuse
+          return NextResponse.json({ 
+            error: 'SERVICE_UNAVAILABLE', 
+            message: 'Service temporarily unavailable. Please try again later.' 
+          }, { status: 503 });
         }
+
+        const convos = existingConvos || [];
+        console.log(`[CHAT] User ${userEmail} has ${convos.length} existing conversations`);
+
+        // 1. Check if user is trying a different character than their first one
+        if (convos.length > 0) {
+          const firstCharacter = convos[0].character_id;
+          if (firstCharacter !== characterId) {
+            console.log(`[CHAT] Character locked for ${userEmail}. Locked to: ${firstCharacter}, tried: ${characterId}`);
+            return NextResponse.json({ 
+              error: 'CHARACTER_LOCKED', 
+              message: `You can only interact with one character. You're locked to your first choice: ${firstCharacter}`,
+              lockedCharacter: firstCharacter
+            }, { status: 403 });
+          }
+        }
+
+        // 2. STRICT: Check if user has used up their 2 free queries
+        if (convos.length >= 2) {
+          console.log(`[CHAT] RATE LIMIT ENFORCED for ${userEmail}. Count: ${convos.length}`);
+          return NextResponse.json({ 
+            error: 'RATE_LIMIT_REACHED', 
+            message: 'You have reached the maximum of 2 free interactions. Please share your feedback to help us improve!' 
+          }, { status: 429 });
+        }
+        
+        interactionsCount = convos.length + 1; // Including the current query
+        console.log(`[CHAT] User ${userEmail} interaction ${interactionsCount}/2`);
+
       } catch (dbError) {
         console.error('[CHAT] Database connection error:', dbError);
-        // Continue without rate limiting if database is completely unavailable
-        console.log('[CHAT] Continuing without rate limiting due to database connection error');
+        // STRICT: If database is completely unavailable, block to prevent abuse
+        return NextResponse.json({ 
+          error: 'SERVICE_UNAVAILABLE', 
+          message: 'Service temporarily unavailable. Please try again later.' 
+        }, { status: 503 });
       }
     }
 
