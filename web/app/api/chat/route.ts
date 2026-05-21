@@ -261,20 +261,27 @@ ${contextText}`;
       }
     }
 
-    // Log conversation to track usage
+    // Log conversation to track usage - CRITICAL for rate limiting
     if (userEmail) {
       try {
         const logSupabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-        logSupabase.from('conversations').insert({
+        console.log(`[CHAT] Logging conversation for ${userEmail} with character ${characterId}`);
+        
+        const { data, error } = await logSupabase.from('conversations').insert({
           session_id: userEmail,
           character_id: characterId,
           user_message: query,
           avatar_response: responseText
-        }).then(({ error }) => {
-          if (error) console.warn('[CHAT] Failed to log conversation:', error);
         });
+        
+        if (error) {
+          console.error('[CHAT] CRITICAL: Failed to log conversation:', JSON.stringify(error, null, 2));
+          console.error('[CHAT] This will break rate limiting!');
+        } else {
+          console.log('[CHAT] ✅ Conversation logged successfully for rate limiting');
+        }
       } catch (err) {
-        console.warn('[CHAT] Conversation logging failed:', err);
+        console.error('[CHAT] CRITICAL: Conversation logging exception:', err);
       }
     }
 
