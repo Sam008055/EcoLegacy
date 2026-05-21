@@ -82,12 +82,22 @@ export async function POST(req: Request) {
           .order('created_at', { ascending: true });
 
         if (convoError) {
-          console.error('[CHAT] Supabase conversation query error:', convoError);
-          // STRICT: If database fails, block the user to prevent abuse
-          return NextResponse.json({ 
-            error: 'SERVICE_UNAVAILABLE', 
-            message: 'Service temporarily unavailable. Please try again later.' 
-          }, { status: 503 });
+          console.error('[CHAT] Supabase conversation query error:', JSON.stringify(convoError, null, 2));
+          console.error('[CHAT] Supabase URL:', supabaseUrl ? 'SET' : 'MISSING');
+          console.error('[CHAT] Supabase Key:', supabaseKey ? 'SET' : 'MISSING');
+          
+          // Check if it's a specific database error we can handle
+          if (convoError.code === 'PGRST116' || convoError.message?.includes('relation') || convoError.message?.includes('does not exist')) {
+            console.log('[CHAT] Table does not exist, allowing request to continue');
+            // Table doesn't exist yet, allow the request (first time setup)
+          } else {
+            // Other database errors - block to prevent abuse
+            return NextResponse.json({ 
+              error: 'SERVICE_UNAVAILABLE', 
+              message: 'Service temporarily unavailable. Please try again later.',
+              details: convoError.message 
+            }, { status: 503 });
+          }
         }
 
         const convos = existingConvos || [];
@@ -118,13 +128,23 @@ export async function POST(req: Request) {
         interactionsCount = convos.length + 1; // Including the current query
         console.log(`[CHAT] User ${userEmail} interaction ${interactionsCount}/2`);
 
-      } catch (dbError) {
-        console.error('[CHAT] Database connection error:', dbError);
-        // STRICT: If database is completely unavailable, block to prevent abuse
-        return NextResponse.json({ 
-          error: 'SERVICE_UNAVAILABLE', 
-          message: 'Service temporarily unavailable. Please try again later.' 
-        }, { status: 503 });
+      } catch (dbError: any) {
+        console.error('[CHAT] Database connection error:', JSON.stringify(dbError, null, 2));
+        console.error('[CHAT] Error message:', dbError.message);
+        console.error('[CHAT] Error code:', dbError.code);
+        
+        // Check if it's a table/schema issue we can handle
+        if (dbError.message?.includes('relation') || dbError.message?.includes('does not exist') || dbError.code === 'PGRST116') {
+          console.log('[CHAT] Database schema issue, allowing request to continue');
+          // Allow the request to continue for first-time setup
+        } else {
+          // Other connection errors - block to prevent abuse
+          return NextResponse.json({ 
+            error: 'SERVICE_UNAVAILABLE', 
+            message: 'Service temporarily unavailable. Please try again later.',
+            details: dbError.message 
+          }, { status: 503 });
+        }
       }
     }
 
