@@ -1,29 +1,48 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Groq from 'groq-sdk';
-import { pipeline, env } from '@xenova/transformers';
 import { characters, CharacterId } from '@/utils/characters';
-
-// Configure transformers to not look for local models in the node_modules directory
-env.allowLocalModels = false;
-env.useBrowserCache = false;
 
 // We can instantiate these outside the handler to reuse them across requests (if the runtime allows)
 let embeddingPipeline: any = null;
 
 export async function POST(req: Request) {
   try {
+    console.log('[CHAT] API called');
+    
     const { query, characterId, userEmail } = await req.json();
+    console.log('[CHAT] Request data:', { query: query?.substring(0, 50), characterId, userEmail });
 
     if (!query) {
       return NextResponse.json({ error: 'Query is required' }, { status: 400 });
     }
 
     const character = characters[characterId as CharacterId] || characters.osho;
+    console.log('[CHAT] Character selected:', character.name);
 
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    // Check environment variables
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const groqKey = process.env.GROQ_API_KEY;
+
+    console.log('[CHAT] Environment check:', {
+      supabaseUrl: supabaseUrl ? 'SET' : 'MISSING',
+      supabaseKey: supabaseKey ? 'SET' : 'MISSING', 
+      groqKey: groqKey ? 'SET' : 'MISSING'
+    });
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('[CHAT] Missing Supabase credentials');
+      return NextResponse.json({ error: 'Supabase configuration missing' }, { status: 500 });
+    }
+
+    if (!groqKey) {
+      console.error('[CHAT] Missing Groq API key');
+      return NextResponse.json({ error: 'Groq API key missing' }, { status: 500 });
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey);
+    console.log('[CHAT] Supabase client created');
 
     let interactionsCount = 0;
     const ADMIN_EMAIL = 'samarthpasalkar4@gmail.com';
@@ -83,49 +102,16 @@ export async function POST(req: Request) {
       });
     }
 
-    // 1. Generate Embedding (optimized)
-    console.log('[CHAT] Cache miss. Generating embedding...');
-    if (!embeddingPipeline) {
-      embeddingPipeline = await pipeline('feature-extraction', 'Xenova/all-mpnet-base-v2');
-    }
+    // Skip embedding for now - use simple context
+    console.log(`[CHAT] Generating response without RAG...`);
     
-    // Perform embedding
-    const output = await embeddingPipeline(query, { pooling: 'mean', normalize: true });
-    const queryEmbedding = Array.from(output.data);
-
-    // 2. Query Supabase (RAG) - Optimized for speed
-    console.log(`[CHAT] Searching for context (${character.name})...`);
-
-    const { data: contextChunks, error: supabaseError } = await supabase.rpc('match_documents', {
-      query_embedding: queryEmbedding,
-      match_threshold: 0.2, // Lower threshold for faster results
-      match_count: 2, // Reduced from 3 to 2 for speed
-      p_character_id: character.id
-    });
-
-    if (supabaseError) {
-      console.error('Supabase Error:', supabaseError);
-      throw supabaseError;
-    }
-
-    let contextText = 'No specific context available.';
-    if (contextChunks && contextChunks.length > 0) {
-      // Take only the most relevant chunk for speed
-      contextText = contextChunks[0].content;
-    }
-
-    // 3. Generate Text with Groq (optimized prompt)
-    console.log(`[CHAT] Generating response...`);
     const groq = new Groq({
-      apiKey: process.env.GROQ_API_KEY,
+      apiKey: groqKey,
     });
 
     const systemPrompt = `${character.systemPrompt}
 
-CRITICAL: Keep responses EXTREMELY short - maximum 15 words. Be direct and conversational.
-
-Context (use only if directly relevant):
-${contextText}`;
+CRITICAL: Keep responses EXTREMELY short - maximum 15 words. Be direct and conversational.`;
 
     const chatCompletion = await groq.chat.completions.create({
       messages: [
@@ -133,7 +119,7 @@ ${contextText}`;
         { role: 'user', content: query }
       ],
       model: 'llama-3.1-8b-instant',
-      max_tokens: 50, // Reduced from default for shorter responses
+      max_tokens: 50,
       temperature: 0.7,
     });
 
@@ -171,7 +157,11 @@ ${contextText}`;
     });
 
   } catch (error: any) {
-    console.error('API Error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    console.error('[CHAT] API Error:', error);
+    console.error('[CHAT] Error stack:', error.stack);
+    return NextResponse.json({ 
+      error: error.message || 'Internal Server Error',
+      details: error.stack?.split('\n')[0] || 'Unknown error'
+    }, { status: 500 });
   }
 }
