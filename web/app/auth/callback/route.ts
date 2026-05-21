@@ -14,18 +14,14 @@ export async function GET(request: Request) {
     
     // If flow state already used, redirect to home (user is likely already logged in)
     if (error === 'invalid_request' && errorDescription?.includes('flow_state_already_used')) {
-      const redirectUrl = process.env.NEXT_PUBLIC_SITE_URL 
-        ? `${process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '')}${next}`
-        : `${origin}${next}`
+      const redirectUrl = `https://eco-legacy-alpha.vercel.app${next}`
       
       console.log(`[AUTH] Flow state already used, redirecting to: ${redirectUrl}`)
       return NextResponse.redirect(redirectUrl)
     }
     
     // For other errors, redirect to error page
-    const errorUrl = process.env.NEXT_PUBLIC_SITE_URL
-      ? `${process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '')}/auth/auth-code-error`
-      : `${origin}/auth/auth-code-error`
+    const errorUrl = `https://eco-legacy-alpha.vercel.app/auth/auth-code-error`
       
     return NextResponse.redirect(errorUrl)
   }
@@ -48,9 +44,7 @@ export async function GET(request: Request) {
   }
 
   // return the user to an error page with instructions
-  const errorUrl = process.env.NEXT_PUBLIC_SITE_URL
-    ? `${process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '')}/auth/auth-code-error`
-    : `${origin}/auth/auth-code-error`
+  const errorUrl = `https://eco-legacy-alpha.vercel.app/auth/auth-code-error`
     
   return NextResponse.redirect(errorUrl)
 }
